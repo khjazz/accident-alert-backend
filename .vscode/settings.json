@@ -1,0 +1,4 @@
+{
+    "appService.defaultWebAppToDeploy": "/subscriptions/912b30f0-f7b2-40b8-b099-9dfea6203cf3/resourceGroups/appsvc_linux_centralus/providers/Microsoft.Web/sites/accident-alert",
+    "appService.deploySubpath": "."
+}
