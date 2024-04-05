@@ -36,4 +36,4 @@ class DeviceService {
   }
 }
 
-export default DeviceService
+export default DeviceService;
