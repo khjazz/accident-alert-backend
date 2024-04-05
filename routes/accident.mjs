@@ -1,25 +1,16 @@
 import multer from 'multer';
 import express from 'express';
-import path from 'path'
 import db from '../db/conn.mjs';
 import AccidentService from '../services/accidentService.mjs';
 import authenticateToken from '../middlewares/authMiddleware.mjs';
 import SubscriptionService from '../services/subscriptionService.mjs';
 import NotificationService from '../services/notificationService.mjs';
 import DeviceService from '../services/deviceService.mjs';
+import { GridFSBucket } from 'mongodb';
 
 const router = express.Router();
 
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'videos/')
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname))
-  }
-})
-
-const upload = multer({ storage: storage })
+const upload = multer()
 
 function parseIPAddress(ipWithPort) {
   const ipRegex = /(\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)|(\[[0-9a-f:]+\])/i;
@@ -33,30 +24,43 @@ router.post('/report', upload.single('file'), async (req, res) => {
     res.status(400).send({ 'error': 'No file' })
     return
   }
-  try {
-    const { accidents, time } = req.body
-    const { filename } = req.file
-    const ip = parseIPAddress(req.ip)
 
-    const report = new ReportHandler(new AccidentService(db))
-    await report.reportAccident(ip, accidents, time, filename)
-    const notification = new NotificationHandler(new SubscriptionService(db), new NotificationService())
-    await notification.notify(ip, accidents, time, filename)
-    res.send({ 'message': 'Report successful' });
-  } catch (error) {
-    console.log(error);
-    res.status(400).send({ error: error });
-    return;
-  }
-});
+  const bucket = new GridFSBucket(db, { bucketName: 'recordings' });
+  const uploadStream = bucket.openUploadStream(file.originalname, {
+    contentType: file.mimetype,
+  });
+  uploadStream.end(file.buffer);
+
+  uploadStream.on('error', (error) => {
+    console.error(error);
+    res.status(500).send({ 'error': 'Error uploading file' });
+  });
+
+  uploadStream.on('finish', async function () {
+    const { accidents, time } = req.body;
+    const ip = parseIPAddress(req.ip);
+
+    try {
+      const report = new ReportHandler(new AccidentService(db));
+      await report.reportAccident(ip, accidents, time, this.gridFSFile._id);
+      const notification = new NotificationHandler(new SubscriptionService(db), new NotificationService());
+      await notification.notify(ip, accidents, time, this.gridFSFile._id);
+
+      res.json({ message: 'Report successful' });
+    } catch (error) {
+      console.error(error);
+      res.status(500).send({ error: 'Error reporting accident' });
+    }
+  })
+})
 
 class ReportHandler {
   constructor(accidentService) {
     this.accidentService = accidentService
   }
 
-  async reportAccident(ip, accidents, time, filename) {
-    await this.accidentService.reportAccident(ip, accidents, time, filename)
+  async reportAccident(ip, accidents, time, recordingId) {
+    await this.accidentService.reportAccident(ip, accidents, time, recordingId)
   }
 }
 
@@ -66,7 +70,7 @@ class NotificationHandler {
     this.notificationService = notificationService
   }
 
-  async notify(ip, accidents, time, filename) {
+  async notify(ip, accidents, time, recordingId) {
     const subscriptions = await this.subscriptionService.getSubscriptionsByIp(ip);
 
     const payload = {
@@ -76,7 +80,7 @@ class NotificationHandler {
         data: {
           accidents,
           time,
-          filename
+          recordingId,
         }
       }
     };

@@ -1,19 +1,22 @@
 import express from 'express'
-import path from 'path'
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import db from '../db/conn.mjs'
+import { GridFSBucket, ObjectId } from 'mongodb';
 
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const router = express.Router();
 
-router.get('/videos/:filename', async (req, res) => {
+router.get('/recordings/:recordingId', async (req, res) => {
   try {
-    const { filename } = req.params;
-    const filePath = path.join(__dirname, '../videos', filename);
-    res.sendFile(filePath);
+    const { recordingId } = req.params;
+    const bucket = new GridFSBucket(db, { bucketName: 'recordings' });
+    const downloadStream = bucket.openDownloadStream(new ObjectId(recordingId));
+
+    downloadStream.on('error', (error) => {
+      console.error(error);
+      res.status(500).send('Internal Server Error');
+    });
+
+    downloadStream.pipe(res);
   } catch (error) {
     console.error(error);
     res.status(500).send('Internal Server Error');

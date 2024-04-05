@@ -3,7 +3,7 @@ class AccidentService {
     this.dbConnection = connection
   }
 
-  async reportAccident(ip, types, time, filename) {
+  async reportAccident(ip, types, time, recordingId) {
     const devices = this.dbConnection.collection('devices')
     const filter = { ip: ip }
     const option = { upsert: true }
@@ -12,7 +12,7 @@ class AccidentService {
         accidents: {
           types: types.split(','),
           time,
-          filename,
+          recordingId,
         }
       }
     }
