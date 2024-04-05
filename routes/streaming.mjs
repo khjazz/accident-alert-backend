@@ -1,13 +1,8 @@
-import fs from 'fs';
 import express from 'express';
 import multer from 'multer';
-import path from 'path'
 import { GridFSBucket, ObjectId } from 'mongodb'
 import db from '../db/conn.mjs'
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 import { parseIPAddress } from '../utils/parse_ip.mjs';
-import DeviceService from '../services/deviceService.mjs';
 
 const router = express.Router();
 
@@ -21,42 +16,34 @@ router.post('/streaming/upload', upload.single('file'), async (req, res) => {
   }
 
   const ip = parseIPAddress(req.ip);
-  const bucket = new GridFSBucket(db, { bucketName: 'streaming' });
-
-  bucket.find({ 'metadata.ip': ip }).toArray((err, files) => {
-    if (err) {
-      res.status(500).send({ 'error': 'Internal server error' });
-      return;
-    }
-
+  try {
+    const bucket = new GridFSBucket(db, { bucketName: 'streaming' });
+    const files = await bucket.find({ 'metadata.ip': ip }).toArray();
     if (files.length > 0) {
-      const fileId = files[0]._id;
-      bucket.delete(fileId, (err) => {
-        if (err) {
-          res.status(500).send({ 'error': 'Internal server error' });
-          return;
-        }
-        console.log(`Deleted file with IP address: ${ip}`);
+      files.forEach(async file => {
+        const fileId = file._id;
+        await bucket.delete(fileId)
       });
     }
-
     // Upload the new file
-    const uploadStream = bucket.openUploadStreamWithId(new ObjectId(), file.originalname, {
+    const uploadStream = bucket.openUploadStream(file.originalname, {
       contentType: file.mimetype,
       metadata: { ip: ip }
     });
-    const readStream = fs.createReadStream(file.path);
-    readStream.pipe(uploadStream);
+    uploadStream.end(file.buffer);
 
-    uploadStream.on('error', (err) => {
+    uploadStream.on('error', (error) => {
+      console.error(error);
       res.status(500).send({ 'error': 'Internal server error' });
     });
 
     uploadStream.on('finish', () => {
       res.status(200).send({ 'message': 'File uploaded successfully' });
     });
-  });
-})
+  } catch (err) {
+    res.status(500).send({ 'error': 'Internal server error' });
+  }
+});
 
 router.get('/streaming/:ip', async (req, res) => {
   try {
@@ -77,7 +64,6 @@ router.get('/streaming/:ip', async (req, res) => {
     console.error(error);
     res.status(500).send('Internal Server Error');
   }
-
 })
 
 export default router;
