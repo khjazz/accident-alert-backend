@@ -28,7 +28,11 @@ class AccidentService {
     const userDevices = await devices.find({ userID }).toArray()
 
     const accidents = userDevices.reduce((acc, device) => {
-      return acc.concat(device.accidents || [])
+      const deviceAccidents = device.accidents || [];
+      const deviceAccidentsWithIp = deviceAccidents.map(accident => {
+        return { ...accident, ip: device.ip };
+      });
+      return [...acc, ...deviceAccidentsWithIp];
     }, [])
 
     return accidents

@@ -5,6 +5,7 @@ import auth from './routes/auth.mjs'
 import accident from './routes/accident.mjs'
 import device from './routes/device.mjs'
 import subscribe from './routes/subscription.mjs'
+import streaming from './routes/streaming.mjs'
 
 const PORT = process.env.PORT || 5050;
 const app = express();
@@ -23,6 +24,7 @@ app.use('/', auth)
 app.use('/', accident)
 app.use('/', device)
 app.use('/', subscribe)
+app.use('/', streaming)
 app.use('/videos', express.static('videos'))
 
 app.listen(PORT, () => {
