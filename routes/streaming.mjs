@@ -22,7 +22,10 @@ router.post('/streaming/upload', upload.single('file'), async (req, res) => {
     if (files.length > 0) {
       files.forEach(async file => {
         const fileId = file._id;
-        await bucket.delete(fileId)
+        try {
+          await bucket.delete(fileId);
+        } catch (error) {
+        }
       });
     }
     // Upload the new file
