@@ -41,8 +41,8 @@ export default class SubscriptionService {
       { $replaceRoot: { newRoot: '$user' } }
     ]
 
-    const user = await this.dbConnection.collection('devices').aggregate(pipeline).next()
-    const userSubscriptions = user.subscriptions ?? [];
+    const user = await this.dbConnection.collection('devices').aggregate(pipeline).next();
+    const userSubscriptions = user ? user.subscriptions : [];
     return userSubscriptions;
   }
 }
