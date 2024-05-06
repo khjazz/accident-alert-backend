@@ -62,6 +62,12 @@ router.get('/streaming/:ip', async (req, res) => {
     res.set('Content-Length', file[0].length)
 
     const downloadStream = bucket.openDownloadStream(new ObjectId(file[0]._id));
+
+    downloadStream.on('error', function (error) {
+      console.error(error);
+      res.status(404).send('File not found');
+    });
+
     downloadStream.pipe(res);
   } catch (error) {
     console.error(error);
